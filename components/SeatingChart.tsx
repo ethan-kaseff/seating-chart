@@ -9,7 +9,7 @@ import GuestModal from './GuestModal';
 import TableModal from './TableModal';
 import ObjectModal from './ObjectModal';
 import Tabs from './Tabs';
-import { importGuestsFromExcel, exportToExcel } from '@/lib/excel';
+import { importFromExcel, exportToExcel } from '@/lib/excel';
 import { VENUE_OBJECT_TYPES } from '@/lib/constants';
 
 const OBJECT_ICONS: Record<string, string> = {
@@ -65,6 +65,7 @@ export default function SeatingChart({ event, onSave }: SeatingChartProps) {
     updateObject,
     deleteObject,
     setZoom,
+    setData,
     getTableById,
   } = useSeatingChart(event.seating_data, handleSave);
 
@@ -223,15 +224,20 @@ export default function SeatingChart({ event, onSave }: SeatingChartProps) {
     if (!file) return;
 
     try {
-      const guests = await importGuestsFromExcel(file);
-      guests.forEach((guest) => {
-        addGuest({
-          ...guest,
-          tableId: null,
-          seatIndex: null,
+      const result = await importFromExcel(file);
+      if (result.type === 'full') {
+        setData(result.data);
+        alert(`Imported full seating chart: ${result.data.guests.length} guests, ${result.data.tables.length} tables, ${result.data.objects.length} objects`);
+      } else {
+        result.guests.forEach((guest) => {
+          addGuest({
+            ...guest,
+            tableId: null,
+            seatIndex: null,
+          });
         });
-      });
-      alert(`Imported ${guests.length} guests`);
+        alert(`Imported ${result.guests.length} guests`);
+      }
     } catch (error) {
       alert('Failed to import file. Please check the format.');
       console.error(error);
