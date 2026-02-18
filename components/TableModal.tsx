@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Table } from '@/types';
-import { TABLE_COLORS } from '@/lib/constants';
+import { useState, useEffect, useMemo } from 'react';
+import { Table, Guest } from '@/types';
+import { TABLE_COLORS, GROUP_COLORS } from '@/lib/constants';
 
 interface TableModalProps {
   table: Table | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; seatCount: number; color: string; id?: string }) => void;
+  onSave: (data: { name: string; seatCount: number; color: string; id?: string; preselectedGuestIds?: string[] }) => void;
   onDelete?: () => void;
+  onDuplicate?: () => void;
+  unassignedGuests?: Guest[];
 }
 
 export default function TableModal({
@@ -18,10 +20,13 @@ export default function TableModal({
   onClose,
   onSave,
   onDelete,
+  onDuplicate,
+  unassignedGuests,
 }: TableModalProps) {
   const [name, setName] = useState('');
   const [seatCount, setSeatCount] = useState(8);
   const [color, setColor] = useState(TABLE_COLORS[0]);
+  const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (table) {
@@ -33,7 +38,59 @@ export default function TableModal({
       setSeatCount(8);
       setColor(TABLE_COLORS[0]);
     }
+    setSelectedGuestIds(new Set());
   }, [table, isOpen]);
+
+  // Group unassigned guests by group
+  const guestsByGroup = useMemo(() => {
+    if (!unassignedGuests || table) return {};
+    const groups: Record<string, Guest[]> = {};
+    unassignedGuests.forEach((g) => {
+      const key = g.group || '(No Group)';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(g);
+    });
+    return groups;
+  }, [unassignedGuests, table]);
+
+  const groupColorMap = useMemo(() => {
+    const allGroups = Object.keys(guestsByGroup).filter((g) => g !== '(No Group)').sort();
+    const map: Record<string, string> = {};
+    allGroups.forEach((group, i) => {
+      map[group] = GROUP_COLORS[i % GROUP_COLORS.length];
+    });
+    return map;
+  }, [guestsByGroup]);
+
+  const toggleGuest = (guestId: string) => {
+    setSelectedGuestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(guestId)) next.delete(guestId);
+      else next.add(guestId);
+
+      // Auto-adjust seat count if selected exceeds current
+      if (next.size > seatCount) {
+        setSeatCount(next.size);
+      }
+      return next;
+    });
+  };
+
+  const toggleGroup = (groupGuests: Guest[]) => {
+    setSelectedGuestIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = groupGuests.every((g) => next.has(g.id));
+      if (allSelected) {
+        groupGuests.forEach((g) => next.delete(g.id));
+      } else {
+        groupGuests.forEach((g) => next.add(g.id));
+      }
+      if (next.size > seatCount) {
+        setSeatCount(next.size);
+      }
+      return next;
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,15 +101,18 @@ export default function TableModal({
       name: name.trim(),
       seatCount,
       color,
+      preselectedGuestIds: !table && selectedGuestIds.size > 0 ? Array.from(selectedGuestIds) : undefined,
     });
     onClose();
   };
 
   if (!isOpen) return null;
 
+  const showGuestSelection = !table && unassignedGuests && unassignedGuests.length > 0;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+      <div className={`bg-white rounded-xl shadow-xl w-full mx-4 ${showGuestSelection ? 'max-w-lg max-h-[90vh] overflow-y-auto' : 'max-w-md'}`}>
         <div className="p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             {table ? 'Edit Table' : 'Add Table'}
@@ -110,6 +170,64 @@ export default function TableModal({
               </div>
             </div>
 
+            {/* Guest pre-selection for new tables */}
+            {showGuestSelection && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pre-assign Guests ({selectedGuestIds.size} selected)
+                </label>
+                <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                  {Object.entries(guestsByGroup).sort(([a], [b]) => a.localeCompare(b)).map(([group, groupGuests]) => {
+                    const allSelected = groupGuests.every((g) => selectedGuestIds.has(g.id));
+                    const someSelected = groupGuests.some((g) => selectedGuestIds.has(g.id));
+                    const gColor = groupColorMap[group];
+
+                    return (
+                      <div key={group}>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(groupGuests)}
+                          className="w-full px-3 py-1.5 flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 border-b border-gray-100"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                            readOnly
+                            className="rounded"
+                          />
+                          <span
+                            className="px-1.5 py-0.5 rounded text-xs"
+                            style={gColor ? {
+                              backgroundColor: `${gColor}20`,
+                              color: gColor,
+                            } : undefined}
+                          >
+                            {group}
+                          </span>
+                          <span className="text-gray-400 text-xs">({groupGuests.length})</span>
+                        </button>
+                        {groupGuests.map((guest) => (
+                          <label
+                            key={guest.id}
+                            className="flex items-center gap-2 px-3 py-1.5 pl-8 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedGuestIds.has(guest.id)}
+                              onChange={() => toggleGuest(guest.id)}
+                              className="rounded"
+                            />
+                            <span className="text-gray-700">{guest.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               {table && onDelete && (
                 <button
@@ -123,6 +241,18 @@ export default function TableModal({
                   className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
                 >
                   Delete
+                </button>
+              )}
+              {table && onDuplicate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDuplicate();
+                    onClose();
+                  }}
+                  className="px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50"
+                >
+                  Duplicate
                 </button>
               )}
               <button

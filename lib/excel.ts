@@ -18,6 +18,7 @@ function parseGuestRows(rows: Record<string, string>[]): ImportedGuest[] {
       dietary: dietaryRaw
         ? dietaryRaw.split(',').map((d: string) => d.trim()).filter(Boolean)
         : [],
+      notes: row['Notes'] || row['notes'] || '',
     };
   }).filter((g) => g.name);
 }
@@ -135,6 +136,7 @@ function importFullSeatingChart(workbook: XLSX.WorkBook): SeatingData {
         group: String(row['Group'] || row['Party'] || ''),
         meal: String(row['Meal'] || 'Standard'),
         dietary,
+        notes: String(row['Notes'] || ''),
         tableId,
         seatIndex: tableId && seatIndex != null && !isNaN(seatIndex) ? seatIndex : null,
       };
@@ -242,6 +244,7 @@ export function exportToExcel(data: SeatingData, eventTitle: string) {
       Group: guest.group,
       Meal: guest.meal,
       Dietary: guest.dietary.join(', '),
+      Notes: guest.notes || '',
       Table: table?.name || '',
       TableId: guest.tableId ? (tableIdToNum.get(guest.tableId) ?? '') : '',
       SeatIndex: guest.seatIndex ?? '',

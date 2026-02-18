@@ -39,3 +39,43 @@ body {
   opacity: 0.8;
   cursor: grabbing;
 }
+
+@media print {
+  /* Hide UI chrome */
+  nav, header, .no-print,
+  button, input[type="file"],
+  [class*="border-b border-gray-200 px-4 py-2"] {
+    display: none !important;
+  }
+
+  /* Show everything */
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Floor plan: fill page */
+  .floor-plan {
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    background-image: none !important;
+    page-break-after: always;
+  }
+
+  /* Guest sidebar: print as list on next page */
+  .print-guest-list {
+    display: block !important;
+    page-break-before: always;
+  }
+
+  /* Keep modals hidden */
+  .fixed.inset-0 {
+    display: none !important;
+  }
+}

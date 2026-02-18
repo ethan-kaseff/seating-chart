@@ -9,9 +9,13 @@ interface TableProps {
   zoom: number;
   onDragEnd: (id: string, x: number, y: number) => void;
   onSeatClick: (tableId: string, seatIndex: number, guestId: string | null) => void;
-  onTableClick: (tableId: string) => void;
+  onTableClick: (tableId: string, e?: React.MouseEvent | MouseEvent) => void;
+  onGuestDrop?: (guestId: string, tableId: string, seatIndex: number) => void;
   selectedGuestId: string | null;
   selectedSeatInfo: { tableId: string; seatIndex: number } | null;
+  isMultiSelected?: boolean;
+  snapToGrid?: boolean;
+  gridSize?: number;
 }
 
 export default function Table({
@@ -21,16 +25,23 @@ export default function Table({
   onDragEnd,
   onSeatClick,
   onTableClick,
+  onGuestDrop,
   selectedGuestId,
   selectedSeatInfo,
+  isMultiSelected,
+  snapToGrid,
+  gridSize = 20,
 }: TableProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; tableX: number; tableY: number } | null>(null);
+  const didDragRef = useRef(false);
 
   const tableSize = 100;
   const seatSize = 28;
   const seatDistance = tableSize / 2 + 20;
+
+  const snap = (v: number) => snapToGrid ? Math.round(v / gridSize) * gridSize : v;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Don't start drag if clicking on a seat
@@ -38,6 +49,7 @@ export default function Table({
 
     e.preventDefault();
     setIsDragging(true);
+    didDragRef.current = false;
 
     // Store the initial mouse position and table position
     dragStartRef.current = {
@@ -51,16 +63,18 @@ export default function Table({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !dragStartRef.current || !tableRef.current) return;
 
+    didDragRef.current = true;
     const dx = (e.clientX - dragStartRef.current.x) / zoom;
     const dy = (e.clientY - dragStartRef.current.y) / zoom;
 
-    const newX = dragStartRef.current.tableX + dx;
-    const newY = dragStartRef.current.tableY + dy;
+    const newX = snap(dragStartRef.current.tableX + dx);
+    const newY = snap(dragStartRef.current.tableY + dy);
 
     // Update position visually
     tableRef.current.style.left = `${newX - tableSize / 2 - seatDistance}px`;
     tableRef.current.style.top = `${newY - tableSize / 2 - seatDistance}px`;
-  }, [isDragging, zoom, tableSize, seatDistance]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging, zoom, tableSize, seatDistance, snapToGrid, gridSize]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
     if (!isDragging || !dragStartRef.current) return;
@@ -68,14 +82,15 @@ export default function Table({
     const dx = (e.clientX - dragStartRef.current.x) / zoom;
     const dy = (e.clientY - dragStartRef.current.y) / zoom;
 
-    const newX = dragStartRef.current.tableX + dx;
-    const newY = dragStartRef.current.tableY + dy;
+    const newX = snap(dragStartRef.current.tableX + dx);
+    const newY = snap(dragStartRef.current.tableY + dy);
 
     setIsDragging(false);
     dragStartRef.current = null;
 
     onDragEnd(table.id, newX, newY);
-  }, [isDragging, zoom, table.id, onDragEnd]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging, zoom, table.id, onDragEnd, snapToGrid, gridSize]);
 
   // Use document-level event listeners for drag
   useEffect(() => {
@@ -113,7 +128,9 @@ export default function Table({
     >
       {/* Table center */}
       <div
-        className="absolute rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg cursor-pointer hover:opacity-90"
+        className={`absolute rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg cursor-pointer hover:opacity-90 ${
+          isMultiSelected ? 'ring-4 ring-blue-400 ring-offset-2' : ''
+        }`}
         style={{
           width: tableSize,
           height: tableSize,
@@ -123,10 +140,17 @@ export default function Table({
         }}
         onClick={(e) => {
           e.stopPropagation();
-          onTableClick(table.id);
+          if (!didDragRef.current) {
+            onTableClick(table.id, e);
+          }
         }}
       >
-        {table.name}
+        <div className="flex flex-col items-center">
+          <span>{table.name}</span>
+          <span className="text-xs opacity-80 font-normal">
+            {guests.filter((g) => g.tableId === table.id).length}/{table.seats.length}
+          </span>
+        </div>
       </div>
 
       {/* Seats */}
@@ -159,6 +183,20 @@ export default function Table({
             onClick={(e) => {
               e.stopPropagation();
               onSeatClick(table.id, index, guest?.id || null);
+            }}
+            onDragOver={(e) => {
+              if (!guest) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const guestId = e.dataTransfer.getData('guestId');
+              if (guestId && !guest && onGuestDrop) {
+                onGuestDrop(guestId, table.id, index);
+              }
             }}
             title={guest?.name || (selectedGuestId ? 'Click to place guest here' : `Seat ${index + 1}`)}
           >

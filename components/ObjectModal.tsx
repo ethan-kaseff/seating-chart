@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { VenueObject } from '@/types';
-import { VENUE_OBJECT_TYPES } from '@/lib/constants';
+import { VENUE_OBJECT_TYPES, PIXELS_PER_FOOT } from '@/lib/constants';
 
 interface ObjectModalProps {
   object: VenueObject | null;
@@ -21,23 +21,39 @@ export default function ObjectModal({
 }: ObjectModalProps) {
   const [type, setType] = useState<VenueObject['type']>('stage');
   const [label, setLabel] = useState('');
-  const [width, setWidth] = useState(200);
-  const [height, setHeight] = useState(80);
+  const [widthFt, setWidthFt] = useState(Math.round(200 / PIXELS_PER_FOOT));
+  const [heightFt, setHeightFt] = useState(Math.round(80 / PIXELS_PER_FOOT));
   const [color, setColor] = useState('#9333EA');
+  const [padTopFt, setPadTopFt] = useState(0);
+  const [padRightFt, setPadRightFt] = useState(0);
+  const [padBottomFt, setPadBottomFt] = useState(0);
+  const [padLeftFt, setPadLeftFt] = useState(0);
+  const [uniformPadding, setUniformPadding] = useState(true);
 
   useEffect(() => {
     if (object) {
       setType(object.type);
       setLabel(object.label);
-      setWidth(object.width);
-      setHeight(object.height);
+      setWidthFt(Math.round(object.width / PIXELS_PER_FOOT));
+      setHeightFt(Math.round(object.height / PIXELS_PER_FOOT));
       setColor(object.color);
+      const p = object.padding || { top: 0, right: 0, bottom: 0, left: 0 };
+      setPadTopFt(Math.round(p.top / PIXELS_PER_FOOT));
+      setPadRightFt(Math.round(p.right / PIXELS_PER_FOOT));
+      setPadBottomFt(Math.round(p.bottom / PIXELS_PER_FOOT));
+      setPadLeftFt(Math.round(p.left / PIXELS_PER_FOOT));
+      setUniformPadding(p.top === p.right && p.right === p.bottom && p.bottom === p.left);
     } else {
       setType('stage');
       setLabel('');
-      setWidth(200);
-      setHeight(80);
+      setWidthFt(Math.round(200 / PIXELS_PER_FOOT));
+      setHeightFt(Math.round(80 / PIXELS_PER_FOOT));
       setColor('#9333EA');
+      setPadTopFt(0);
+      setPadRightFt(0);
+      setPadBottomFt(0);
+      setPadLeftFt(0);
+      setUniformPadding(true);
     }
   }, [object, isOpen]);
 
@@ -46,8 +62,8 @@ export default function ObjectModal({
     const typeConfig = VENUE_OBJECT_TYPES.find((t) => t.type === newType);
     if (typeConfig && !object) {
       setLabel(typeConfig.label);
-      setWidth(typeConfig.defaultWidth);
-      setHeight(typeConfig.defaultHeight);
+      setWidthFt(Math.round(typeConfig.defaultWidth / PIXELS_PER_FOOT));
+      setHeightFt(Math.round(typeConfig.defaultHeight / PIXELS_PER_FOOT));
     }
   };
 
@@ -59,9 +75,15 @@ export default function ObjectModal({
       id: object?.id,
       type,
       label: label.trim(),
-      width,
-      height,
+      width: widthFt * PIXELS_PER_FOOT,
+      height: heightFt * PIXELS_PER_FOOT,
       color,
+      padding: {
+        top: padTopFt * PIXELS_PER_FOOT,
+        right: padRightFt * PIXELS_PER_FOOT,
+        bottom: padBottomFt * PIXELS_PER_FOOT,
+        left: padLeftFt * PIXELS_PER_FOOT,
+      },
     });
     onClose();
   };
@@ -81,7 +103,7 @@ export default function ObjectModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Type
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {VENUE_OBJECT_TYPES.map((t) => (
                   <button
                     key={t.type}
@@ -116,28 +138,120 @@ export default function ObjectModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Width
+                  Width (ft)
                 </label>
                 <input
                   type="number"
-                  value={width}
-                  onChange={(e) => setWidth(Math.max(20, parseInt(e.target.value) || 20))}
-                  min={20}
+                  value={widthFt}
+                  onChange={(e) => setWidthFt(Math.max(1, parseInt(e.target.value) || 1))}
+                  min={1}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Height
+                  Height (ft)
                 </label>
                 <input
                   type="number"
-                  value={height}
-                  onChange={(e) => setHeight(Math.max(20, parseInt(e.target.value) || 20))}
-                  min={20}
+                  value={heightFt}
+                  onChange={(e) => setHeightFt(Math.max(1, parseInt(e.target.value) || 1))}
+                  min={1}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+            </div>
+
+            {/* Exclusion Zone Padding */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Exclusion Zone (ft)
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={uniformPadding}
+                    onChange={(e) => {
+                      setUniformPadding(e.target.checked);
+                      if (e.target.checked) {
+                        setPadRightFt(padTopFt);
+                        setPadBottomFt(padTopFt);
+                        setPadLeftFt(padTopFt);
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  Uniform
+                </label>
+              </div>
+              {uniformPadding ? (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">All sides</label>
+                  <input
+                    type="number"
+                    value={padTopFt}
+                    onChange={(e) => {
+                      const v = Math.max(0, parseInt(e.target.value) || 0);
+                      setPadTopFt(v);
+                      setPadRightFt(v);
+                      setPadBottomFt(v);
+                      setPadLeftFt(v);
+                    }}
+                    min={0}
+
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Top</label>
+                    <input
+                      type="number"
+                      value={padTopFt}
+                      onChange={(e) => setPadTopFt(Math.max(0, parseInt(e.target.value) || 0))}
+                      min={0}
+  
+                      className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Right</label>
+                    <input
+                      type="number"
+                      value={padRightFt}
+                      onChange={(e) => setPadRightFt(Math.max(0, parseInt(e.target.value) || 0))}
+                      min={0}
+  
+                      className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Bottom</label>
+                    <input
+                      type="number"
+                      value={padBottomFt}
+                      onChange={(e) => setPadBottomFt(Math.max(0, parseInt(e.target.value) || 0))}
+                      min={0}
+  
+                      className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Left</label>
+                    <input
+                      type="number"
+                      value={padLeftFt}
+                      onChange={(e) => setPadLeftFt(Math.max(0, parseInt(e.target.value) || 0))}
+                      min={0}
+  
+                      className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Tables won&apos;t be placed within this area when arranging.</p>
             </div>
 
             <div>

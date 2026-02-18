@@ -21,6 +21,7 @@ export default function GuestModal({
   const [group, setGroup] = useState('');
   const [meal, setMeal] = useState('Standard');
   const [dietary, setDietary] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (guest) {
@@ -28,11 +29,13 @@ export default function GuestModal({
       setGroup(guest.group);
       setMeal(guest.meal);
       setDietary(guest.dietary);
+      setNotes(guest.notes || '');
     } else {
       setName('');
       setGroup('');
       setMeal('Standard');
       setDietary([]);
+      setNotes('');
     }
   }, [guest, isOpen]);
 
@@ -46,6 +49,7 @@ export default function GuestModal({
       group: group.trim(),
       meal,
       dietary,
+      notes: notes.trim(),
     });
     onClose();
   };
@@ -112,6 +116,19 @@ export default function GuestModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                placeholder="e.g., needs wheelchair access, VIP, keep away from..."
+                rows={2}
+              />
             </div>
 
             <div>

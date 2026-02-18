@@ -74,6 +74,13 @@ export async function deleteEvent(id: number, userId: number) {
   return result.rows[0] || null;
 }
 
+export async function getEventByIdPublic(id: number): Promise<Event | null> {
+  const result = await sql`
+    SELECT * FROM events WHERE id = ${id}
+  `;
+  return (result.rows[0] as Event) || null;
+}
+
 export async function getUserByEmail(email: string) {
   const result = await sql`
     SELECT * FROM users WHERE email = ${email}

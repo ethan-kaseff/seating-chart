@@ -4,6 +4,7 @@ export interface Guest {
   group: string;
   meal: string;
   dietary: string[];
+  notes: string;
   tableId: string | null;
   seatIndex: number | null;
 }
@@ -23,13 +24,14 @@ export interface Table {
 
 export interface VenueObject {
   id: string;
-  type: 'stage' | 'bar' | 'dancefloor' | 'entrance' | 'custom';
+  type: 'stage' | 'bar' | 'dancefloor' | 'entrance' | 'buffet' | 'dj' | 'photobooth' | 'restrooms' | 'kitchen' | 'custom';
   label: string;
   x: number;
   y: number;
   width: number;
   height: number;
   color: string;
+  padding?: { top: number; right: number; bottom: number; left: number };
 }
 
 export interface SeatingData {
